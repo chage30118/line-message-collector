@@ -348,8 +348,91 @@ function downloadFile(fileId, fileName) {
 
 // 匯出資料
 function exportData() {
-    // 這裡可以實作匯出 CSV 或 Excel 功能
-    alert('匯出功能開發中...');
+    const exportOptions = [
+        { value: 'users-csv', text: '📋 用戶資料 (CSV)' },
+        { value: 'messages-csv', text: '💬 訊息資料 (CSV)' },
+        { value: 'excel', text: '📊 完整資料 (Excel)' },
+        { value: 'json', text: '💾 完整資料 (JSON)' }
+    ];
+
+    let optionsHtml = exportOptions.map(option => 
+        `<button class="export-btn" onclick="downloadExport('${option.value}')">${option.text}</button>`
+    ).join('');
+
+    const exportModal = `
+        <div class="modal-overlay" onclick="closeExportModal()">
+            <div class="modal-content" onclick="event.stopPropagation()">
+                <div class="modal-header">
+                    <h3>📤 選擇匯出格式</h3>
+                    <button class="close-btn" onclick="closeExportModal()">×</button>
+                </div>
+                <div class="modal-body">
+                    <p>請選擇要匯出的資料格式：</p>
+                    <div class="export-options">
+                        ${optionsHtml}
+                    </div>
+                    <div class="export-info">
+                        <small>
+                            • CSV 格式適合在 Excel 中開啟<br>
+                            • Excel 格式包含多個工作表和統計資料<br>
+                            • JSON 格式適合程式化處理
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', exportModal);
+}
+
+// 下載匯出檔案
+async function downloadExport(type) {
+    const loadingText = '⏳ 正在產生匯出檔案...';
+    showNotification(loadingText, 'info');
+
+    try {
+        let url;
+        switch (type) {
+            case 'users-csv':
+                url = '/api/export/users/csv';
+                break;
+            case 'messages-csv':
+                url = '/api/export/messages/csv';
+                break;
+            case 'excel':
+                url = '/api/export/excel';
+                break;
+            case 'json':
+                url = '/api/export/json';
+                break;
+            default:
+                throw new Error('不支援的匯出格式');
+        }
+
+        // 創建隱藏的下載連結
+        const link = document.createElement('a');
+        link.href = url;
+        link.style.display = 'none';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        showNotification('✅ 匯出成功！檔案已開始下載', 'success');
+        closeExportModal();
+
+    } catch (error) {
+        console.error('匯出失敗:', error);
+        showNotification('❌ 匯出失敗: ' + error.message, 'error');
+    }
+}
+
+// 關閉匯出視窗
+function closeExportModal() {
+    const modal = document.querySelector('.modal-overlay');
+    if (modal) {
+        modal.remove();
+    }
 }
 
 // 分頁控制

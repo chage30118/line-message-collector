@@ -39,3 +39,9 @@ typings/
 .env.production.local
 .vscode
 .idea
+
+# 匯出臨時檔案
+temp/
+*.csv
+*.xlsx
+*.json
