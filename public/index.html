@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LINE 客戶訊息收集系統</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>📱 LINE 客戶訊息收集系統</h1>
+            <div class="stats-bar" id="statsBar">
+                <div class="stat-item">
+                    <span class="stat-label">總訊息:</span>
+                    <span class="stat-value" id="totalMessages">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">總用戶:</span>
+                    <span class="stat-value" id="totalUsers">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">檔案數:</span>
+                    <span class="stat-value" id="totalFiles">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">訊息限制:</span>
+                    <span class="stat-value" id="messageLimit">-</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-label">用戶限制:</span>
+                    <span class="stat-value" id="userLimit">-</span>
+                </div>
+            </div>
+        </header>
+
+        <nav class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('messages')">📝 訊息列表</button>
+            <button class="nav-tab" onclick="showTab('users')">👥 用戶列表</button>
+            <button class="nav-tab" onclick="showTab('search')">🔍 搜尋</button>
+        </nav>
+
+        <!-- 訊息列表頁籤 -->
+        <div id="messagesTab" class="tab-content active">
+            <div class="controls">
+                <div class="filter-controls">
+                    <select id="messageTypeFilter">
+                        <option value="">所有類型</option>
+                        <option value="text">文字</option>
+                        <option value="image">圖片</option>
+                        <option value="file">檔案</option>
+                        <option value="audio">音訊</option>
+                        <option value="video">視訊</option>
+                    </select>
+                    <button onclick="loadMessages()">🔄 重新整理</button>
+                    <button onclick="exportData()">📊 匯出資料</button>
+                </div>
+            </div>
+
+            <div class="message-list" id="messageList">
+                <div class="loading">載入中...</div>
+            </div>
+
+            <div class="pagination">
+                <button onclick="previousPage()" id="prevBtn" disabled>上一頁</button>
+                <span id="pageInfo">第 1 頁</span>
+                <button onclick="nextPage()" id="nextBtn">下一頁</button>
+            </div>
+        </div>
+
+        <!-- 用戶列表頁籤 -->
+        <div id="usersTab" class="tab-content">
+            <div class="controls">
+                <button onclick="loadUsers()">🔄 重新整理</button>
+            </div>
+            <div class="user-list" id="userList">
+                <div class="loading">載入中...</div>
+            </div>
+        </div>
+
+        <!-- 搜尋頁籤 -->
+        <div id="searchTab" class="tab-content">
+            <div class="search-controls">
+                <input type="text" id="searchInput" placeholder="輸入用戶名稱或訊息內容">
+                <button onclick="searchMessages()">🔍 搜尋</button>
+            </div>
+            <div class="search-results" id="searchResults">
+                <p>請輸入搜尋條件</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
