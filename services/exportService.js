@@ -6,6 +6,7 @@ const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { promisify } = require('util');
+const { supabase } = require('../config/supabase');
 const UserService = require('./userService');
 const MessageService = require('./messageService');
 const FileService = require('./fileService');
@@ -306,32 +307,35 @@ class ExportService {
           try {
             console.log(`🔍 處理圖片 ${index + 1}/${imageMessages.length}: ${msg.file_path}`);
             
-            const fileUrl = await FileService.getFileUrl(msg.file_path);
-            if (!fileUrl) {
-              console.warn(`❌ 無法取得圖片URL: ${msg.file_path}`);
+            // 直接從 Supabase Storage 下載檔案
+            const { data: fileData, error } = await supabase.storage
+              .from('line-files')
+              .download(msg.file_path);
+
+            if (error) {
+              console.error(`❌ Supabase Storage 下載失敗: ${msg.file_path}`, error);
               return;
             }
 
-            console.log(`📡 開始下載圖片: ${fileUrl.substring(0, 100)}...`);
-            
-            const response = await axios.get(fileUrl, {
-              responseType: 'stream',
-              timeout: 30000, // 增加超時時間到30秒
-              headers: {
-                'User-Agent': 'LINE-Message-Collector/1.0'
-              }
-            });
+            if (!fileData) {
+              console.warn(`❌ 檔案資料為空: ${msg.file_path}`);
+              return;
+            }
+
+            console.log(`✅ 成功從 Storage 下載圖片: ${msg.file_path}`);
 
             const fileExtension = path.extname(msg.file_name) || '.jpg';
             const displayName = msg.users?.group_display_name || msg.users?.display_name || 'unknown';
             const safeFileName = `${String(index + 1).padStart(3, '0')}_${displayName}_${Date.parse(msg.created_at)}${fileExtension}`;
             
-            archive.append(response.data, { name: safeFileName });
-            console.log(`✅ 成功添加圖片: ${safeFileName}`);
+            // 將 Blob 轉換為 Buffer
+            const buffer = Buffer.from(await fileData.arrayBuffer());
+            archive.append(buffer, { name: safeFileName });
+            console.log(`✅ 成功添加圖片到ZIP: ${safeFileName}`);
 
           } catch (error) {
-            console.error(`❌ 下載圖片失敗 ${msg.file_path}:`, error.message);
-            console.error('錯誤詳情:', error.response?.status, error.response?.statusText);
+            console.error(`❌ 處理圖片失敗 ${msg.file_path}:`, error.message);
+            console.error('錯誤詳情:', error);
           }
         });
 
