@@ -55,6 +55,17 @@ class UserService {
 
       if (insertError) throw insertError;
       console.log(`✅ 新用戶建立成功: ${newUser.display_name || lineUserId}`);
+
+      // 嘗試從 display_name 自動提取群組名稱
+      if (newUser.display_name) {
+        const extractedName = this.extractNameFromDisplayName(newUser.display_name);
+        if (extractedName) {
+          console.log(`🔍 自動設定群組名稱: ${extractedName} (新用戶: ${newUser.display_name})`);
+          const updatedUser = await this.updateGroupDisplayName(newUser.id, extractedName);
+          return updatedUser;
+        }
+      }
+
       return newUser;
 
     } catch (error) {
@@ -128,7 +139,9 @@ class UserService {
         /我是([^，。！？\s]+)/,
         /這是([^，。！？\s]+)/,
         /叫我([^，。！？\s]+)/,
-        /^([A-Za-z0-9\u4e00-\u9fa5\/\-\_\+]+)$/, // 單獨的名稱
+        /^([A-Za-z0-9\u4e00-\u9fa5\/\-\_\+\(\)（）]+)$/, // 單獨的名稱（允許括號）
+        // 如果用戶的 display_name 包含特殊格式，嘗試提取
+        // 例如："潘呈榆-公用手機" -> 可能想要 "潘呈榆"
       ];
 
       for (const pattern of patterns) {
@@ -139,7 +152,7 @@ class UserService {
           // 避免誤判常見詞彙
           const commonWords = ['今天', '昨天', '明天', '什麼', '怎麼', '哪裡', '這樣', '那樣'];
           if (!commonWords.includes(possibleName)) {
-            console.log(`🔍 發現可能的群組名稱: ${possibleName} (來自用戶: ${user.display_name})`);
+            console.log(`🔍 發現可能的群組名稱: ${possibleName} (來自訊息: ${user.display_name})`);
             
             // 如果用戶還沒有群組顯示名稱，自動設定
             if (!user.group_display_name) {
@@ -149,12 +162,45 @@ class UserService {
           }
         }
       }
+
+      // 如果訊息分析失敗，嘗試從 display_name 提取
+      if (!user.group_display_name && user.display_name) {
+        const extractedName = this.extractNameFromDisplayName(user.display_name);
+        if (extractedName) {
+          console.log(`🔍 從顯示名稱提取群組名稱: ${extractedName} (用戶: ${user.display_name})`);
+          await this.updateGroupDisplayName(user.id, extractedName);
+          return extractedName;
+        }
+      }
       
       return null;
     } catch (error) {
       console.error('分析訊息中的名稱失敗:', error);
       return null;
     }
+  }
+
+  // 從 display_name 提取可能的群組名稱
+  static extractNameFromDisplayName(displayName) {
+    if (!displayName || displayName.length < 2) return null;
+
+    // 移除常見的後綴
+    const suffixes = ['-公用手機', '-手機', '的手機', '手機', '🐶', '🐱', '😊', '👍'];
+    let cleanName = displayName;
+    
+    for (const suffix of suffixes) {
+      if (cleanName.endsWith(suffix)) {
+        cleanName = cleanName.replace(suffix, '').trim();
+        break;
+      }
+    }
+
+    // 如果清理後的名稱長度合理且不同於原名
+    if (cleanName.length >= 2 && cleanName.length <= 10 && cleanName !== displayName) {
+      return cleanName;
+    }
+
+    return null;
   }
 }
 
