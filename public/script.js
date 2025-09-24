@@ -4,6 +4,35 @@ let currentLimit = 20;
 let allMessages = [];
 let allUsers = [];
 
+// 通知系統
+console.log('Defining showNotification function');
+function showNotification(message, type = 'info') {
+    console.log('showNotification called with:', message, type);
+    // 移除現有通知
+    const existingNotification = document.querySelector('.notification');
+    if (existingNotification) {
+        existingNotification.remove();
+    }
+
+    // 創建通知元素
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.innerHTML = `
+        <span class="notification-message">${message}</span>
+        <button class="notification-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    // 添加到頁面
+    document.body.appendChild(notification);
+
+    // 3秒後自動移除
+    setTimeout(() => {
+        if (notification.parentElement) {
+            notification.remove();
+        }
+    }, 3000);
+}
+
 // 頁面載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
     loadStats();
@@ -242,12 +271,12 @@ async function showUserMessages(lineUserId) {
         const user = allUsers.find(u => u.line_user_id === lineUserId);
         const userName = user ? user.display_name : lineUserId;
         
-        // 可以在這裡添加一個提示訊息
-        alert(`正在顯示用戶 ${userName} 的訊息 (${data.count} 則)`);
+        // 顯示成功訊息
+        showNotification(`✅ 正在顯示用戶 ${userName} 的訊息 (${data.count} 則)`, 'success');
         
     } catch (error) {
         console.error('載入用戶訊息失敗:', error);
-        alert('載入用戶訊息失敗');
+        showNotification('❌ 載入用戶訊息失敗', 'error');
     }
 }
 
@@ -256,7 +285,7 @@ async function searchMessages() {
     const searchTerm = document.getElementById('searchInput').value.trim();
     
     if (!searchTerm) {
-        alert('請輸入搜尋條件');
+        showNotification('⚠️ 請輸入搜尋條件', 'error');
         return;
     }
     
@@ -392,6 +421,8 @@ function exportData() {
 
 // 下載匯出檔案
 async function downloadExport(type) {
+    console.log('downloadExport called with type:', type);
+    console.log('typeof showNotification:', typeof showNotification);
     const loadingText = '⏳ 正在產生匯出檔案...';
     showNotification(loadingText, 'info');
 
@@ -420,6 +451,16 @@ async function downloadExport(type) {
                 throw new Error('不支援的匯出格式');
         }
 
+        // 先檢查端點是否可用
+        const testResponse = await fetch(url, { method: 'HEAD' });
+        
+        if (!testResponse.ok) {
+            if (testResponse.status === 404) {
+                throw new Error('沒有找到圖片檔案，請先發送一些圖片到LINE Bot');
+            }
+            throw new Error(`伺服器錯誤 (${testResponse.status})`);
+        }
+
         // 創建隱藏的下載連結
         const link = document.createElement('a');
         link.href = url;
@@ -428,12 +469,18 @@ async function downloadExport(type) {
         link.click();
         document.body.removeChild(link);
 
-        showNotification('✅ 匯出成功！檔案已開始下載', 'success');
-        closeExportModal();
+        // 延遲顯示成功訊息
+        setTimeout(() => {
+            showNotification('✅ 匯出成功！檔案已開始下載', 'success');
+            closeExportModal();
+        }, 800);
 
     } catch (error) {
         console.error('匯出失敗:', error);
-        showNotification('❌ 匯出失敗: ' + error.message, 'error');
+        let errorMessage = '❌ 匯出失敗: ' + error.message;
+        
+        showNotification(errorMessage, 'error');
+        closeExportModal();
     }
 }
 
