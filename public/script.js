@@ -193,6 +193,10 @@ function displayMessages(messages) {
                         }
                         <div>
                             <div class="user-name">${user.display_name || '未知用戶'}</div>
+                            ${user.group_display_name ? 
+                                `<div class="group-name" style="font-size: 0.8rem; color: #007bff; font-weight: 500;">🏷️ ${user.group_display_name}</div>` : 
+                                ''
+                            }
                             <div style="font-size: 0.8rem; color: #666;">${user.line_user_id}</div>
                         </div>
                     </div>
@@ -346,10 +350,12 @@ async function searchMessages() {
         
         const filteredMessages = data.messages.filter(message => {
             const userName = message.users.display_name || '';
+            const groupName = message.users.group_display_name || '';
             const textContent = message.text_content || '';
             const fileName = message.file_name || '';
             
             return userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                   groupName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                    textContent.toLowerCase().includes(searchTerm.toLowerCase()) ||
                    fileName.toLowerCase().includes(searchTerm.toLowerCase());
         });
@@ -388,6 +394,10 @@ function displaySearchResults(messages, searchTerm) {
                                 }
                                 <div>
                                     <div class="user-name">${user.display_name || '未知用戶'}</div>
+                                    ${user.group_display_name ? 
+                                        `<div class="group-name" style="font-size: 0.8rem; color: #007bff; font-weight: 500;">🏷️ ${user.group_display_name}</div>` : 
+                                        ''
+                                    }
                                     <div style="font-size: 0.8rem; color: #666;">${user.line_user_id}</div>
                                 </div>
                             </div>

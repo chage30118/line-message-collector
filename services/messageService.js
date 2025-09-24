@@ -133,7 +133,8 @@ class MessageService {
           users (
             line_user_id,
             display_name,
-            picture_url
+            picture_url,
+            group_display_name
           )
         `)
         .order('timestamp', { ascending: false })
@@ -157,7 +158,8 @@ class MessageService {
           users!inner (
             line_user_id,
             display_name,
-            picture_url
+            picture_url,
+            group_display_name
           )
         `)
         .eq('users.line_user_id', lineUserId)
