@@ -4,11 +4,7 @@ let currentLimit = 20;
 let allMessages = [];
 let allUsers = [];
 
-// 通知系統
-console.log('Defining showNotification function');
-function showNotification(message, type = 'info') {
-    console.log('showNotification called with:', message, type);
-    // 更新用戶的群組顯示名稱
+// 更新用戶的群組顯示名稱
 async function updateGroupDisplayName(userId, groupDisplayName) {
     try {
         if (!groupDisplayName || groupDisplayName.trim().length === 0) {
@@ -43,7 +39,8 @@ async function updateGroupDisplayName(userId, groupDisplayName) {
     }
 }
 
-// 移除調試 console.log
+// 通知系統
+console.log('Defining showNotification function');
 function showNotification(message, type = 'info') {
     console.log('showNotification called with:', message, type);
     // 移除現有通知
