@@ -192,6 +192,54 @@ router.get('/export/json', async (req, res) => {
   }
 });
 
+// 匯出圖片為 ZIP
+router.get('/export/images/zip', async (req, res) => {
+  try {
+    const result = await ExportService.exportImagesToZip();
+    
+    res.download(result.filePath, result.fileName, (err) => {
+      if (err) {
+        console.error('檔案下載失敗:', err);
+        res.status(500).json({ error: 'Download failed' });
+      } else {
+        // 下載完成後清理臨時檔案
+        setTimeout(() => {
+          ExportService.cleanupTempFile(result.filePath);
+        }, 5000);
+      }
+    });
+  } catch (error) {
+    console.error('匯出圖片ZIP失敗:', error);
+    if (error.message === '沒有找到圖片檔案') {
+      res.status(404).json({ error: 'No images found' });
+    } else {
+      res.status(500).json({ error: 'Export failed' });
+    }
+  }
+});
+
+// 匯出 PDF 報告
+router.get('/export/pdf', async (req, res) => {
+  try {
+    const result = await ExportService.exportToPDF();
+    
+    res.download(result.filePath, result.fileName, (err) => {
+      if (err) {
+        console.error('檔案下載失敗:', err);
+        res.status(500).json({ error: 'Download failed' });
+      } else {
+        // 下載完成後清理臨時檔案
+        setTimeout(() => {
+          ExportService.cleanupTempFile(result.filePath);
+        }, 5000);
+      }
+    });
+  } catch (error) {
+    console.error('匯出PDF失敗:', error);
+    res.status(500).json({ error: 'Export failed' });
+  }
+});
+
 // 測試 API 端點
 router.get('/test', (req, res) => {
   res.json({
@@ -207,7 +255,9 @@ router.get('/test', (req, res) => {
       'GET /api/export/users/csv - 匯出用戶CSV',
       'GET /api/export/messages/csv - 匯出訊息CSV',
       'GET /api/export/excel - 匯出Excel檔案',
-      'GET /api/export/json - 匯出JSON檔案'
+      'GET /api/export/json - 匯出JSON檔案',
+      'GET /api/export/images/zip - 匯出圖片ZIP',
+      'GET /api/export/pdf - 匯出PDF報告'
     ]
   });
 });

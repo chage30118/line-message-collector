@@ -1,10 +1,14 @@
 const createCsvWriter = require('csv-writer').createObjectCsvWriter;
 const ExcelJS = require('exceljs');
+const archiver = require('archiver');
+const PDFDocument = require('pdfkit');
+const axios = require('axios');
 const path = require('path');
 const fs = require('fs');
 const { promisify } = require('util');
 const UserService = require('./userService');
 const MessageService = require('./messageService');
+const FileService = require('./fileService');
 
 class ExportService {
   constructor() {
@@ -248,6 +252,210 @@ class ExportService {
       };
     } catch (error) {
       console.error('匯出JSON失敗:', error);
+      throw error;
+    }
+  }
+
+  // 匯出圖片檔案為 ZIP
+  async exportImagesToZip() {
+    try {
+      // 取得所有圖片訊息
+      const messages = await MessageService.getAllMessages(5000, 0);
+      const imageMessages = messages.filter(msg => 
+        msg.message_type === 'image' && msg.file_path
+      );
+
+      if (imageMessages.length === 0) {
+        throw new Error('沒有找到圖片檔案');
+      }
+
+      const fileName = `images_export_${Date.now()}.zip`;
+      const filePath = path.join(this.tempDir, fileName);
+
+      return new Promise((resolve, reject) => {
+        const output = fs.createWriteStream(filePath);
+        const archive = archiver('zip', {
+          zlib: { level: 9 } // 最大壓縮
+        });
+
+        output.on('close', () => {
+          console.log(`✅ 圖片ZIP匯出成功: ${fileName} (${archive.pointer()} bytes)`);
+          resolve({
+            fileName,
+            filePath,
+            imageCount: imageMessages.length,
+            totalSize: archive.pointer()
+          });
+        });
+
+        archive.on('error', (err) => {
+          console.error('ZIP壓縮失敗:', err);
+          reject(err);
+        });
+
+        archive.pipe(output);
+
+        // 添加每個圖片檔案
+        const downloadPromises = imageMessages.map(async (msg, index) => {
+          try {
+            const fileUrl = await FileService.getFileUrl(msg.file_path);
+            if (!fileUrl) {
+              console.warn(`無法取得圖片URL: ${msg.file_path}`);
+              return;
+            }
+
+            const response = await axios.get(fileUrl, {
+              responseType: 'stream',
+              timeout: 10000
+            });
+
+            const fileExtension = path.extname(msg.file_name) || '.jpg';
+            const safeFileName = `${String(index + 1).padStart(3, '0')}_${msg.users?.display_name || 'unknown'}_${Date.parse(msg.created_at)}${fileExtension}`;
+            
+            archive.append(response.data, { name: safeFileName });
+            console.log(`📷 添加圖片: ${safeFileName}`);
+
+          } catch (error) {
+            console.error(`下載圖片失敗 ${msg.file_path}:`, error.message);
+          }
+        });
+
+        // 等待所有圖片下載完成
+        Promise.all(downloadPromises).then(() => {
+          archive.finalize();
+        }).catch(reject);
+      });
+
+    } catch (error) {
+      console.error('匯出圖片ZIP失敗:', error);
+      throw error;
+    }
+  }
+
+  // 生成 PDF 報告
+  async exportToPDF() {
+    try {
+      const [users, messages] = await Promise.all([
+        UserService.getAllUsers(),
+        MessageService.getAllMessages(1000, 0)
+      ]);
+
+      const fileName = `line_report_${Date.now()}.pdf`;
+      const filePath = path.join(this.tempDir, fileName);
+
+      return new Promise((resolve, reject) => {
+        const doc = new PDFDocument({
+          margin: 50,
+          size: 'A4'
+        });
+
+        const stream = fs.createWriteStream(filePath);
+        doc.pipe(stream);
+
+        // 設定中文字體 (使用內建字體，支援基本中文)
+        try {
+          // PDFKit 內建字體不完全支援中文，但可以顯示基本文字
+          doc.font('Helvetica');
+        } catch (error) {
+          console.warn('字體設定警告:', error.message);
+          doc.font('Helvetica');
+        }
+
+        // 標題頁
+        doc.fontSize(24).text('LINE Message Collector Report', 50, 50);
+        doc.fontSize(16).text(`Generated: ${new Date().toLocaleString('zh-TW')}`, 50, 80);
+        
+        // 統計資料
+        doc.fontSize(18).text('Statistics Summary', 50, 120);
+        doc.fontSize(12);
+        
+        const stats = [
+          `Total Users: ${users.length}`,
+          `Total Messages: ${messages.length}`,
+          `Text Messages: ${messages.filter(m => m.message_type === 'text').length}`,
+          `Image Messages: ${messages.filter(m => m.message_type === 'image').length}`,
+          `File Messages: ${messages.filter(m => m.message_type === 'file').length}`,
+          `Audio Messages: ${messages.filter(m => m.message_type === 'audio').length}`,
+          `Video Messages: ${messages.filter(m => m.message_type === 'video').length}`
+        ];
+
+        let yPosition = 150;
+        stats.forEach(stat => {
+          doc.text(`• ${stat}`, 70, yPosition);
+          yPosition += 20;
+        });
+
+        // 用戶列表
+        doc.addPage();
+        doc.fontSize(18).text('User List', 50, 50);
+        doc.fontSize(10);
+
+        yPosition = 80;
+        users.slice(0, 20).forEach((user, index) => { // 限制前20個用戶
+          if (yPosition > 700) {
+            doc.addPage();
+            yPosition = 50;
+          }
+          
+          const userName = user.display_name || user.line_user_id || 'Unknown';
+          const messageCount = user.message_count || 0;
+          const lastMessage = user.last_message_at ? 
+            new Date(user.last_message_at).toLocaleDateString('zh-TW') : 'Never';
+            
+          doc.text(`${index + 1}. ${userName} (${messageCount} messages, Last: ${lastMessage})`, 50, yPosition);
+          yPosition += 15;
+        });
+
+        if (users.length > 20) {
+          doc.text(`... and ${users.length - 20} more users`, 50, yPosition + 10);
+        }
+
+        // 最近訊息
+        doc.addPage();
+        doc.fontSize(18).text('Recent Messages', 50, 50);
+        doc.fontSize(10);
+
+        yPosition = 80;
+        const recentMessages = messages.slice(0, 30); // 最近30條訊息
+
+        recentMessages.forEach((msg, index) => {
+          if (yPosition > 700) {
+            doc.addPage();
+            yPosition = 50;
+          }
+
+          const userName = msg.users?.display_name || 'Unknown';
+          const timestamp = new Date(msg.timestamp).toLocaleString('zh-TW');
+          const content = msg.message_type === 'text' ? 
+            (msg.content?.substring(0, 50) + (msg.content?.length > 50 ? '...' : '')) : 
+            `[${msg.message_type.toUpperCase()}]`;
+
+          doc.text(`${timestamp} - ${userName}:`, 50, yPosition);
+          doc.text(`  ${content}`, 50, yPosition + 12);
+          yPosition += 30;
+        });
+
+        // 結束 PDF
+        doc.end();
+
+        stream.on('finish', () => {
+          console.log(`✅ PDF報告匯出成功: ${fileName}`);
+          resolve({
+            fileName,
+            filePath,
+            userCount: users.length,
+            messageCount: messages.length
+          });
+        });
+
+        stream.on('error', (error) => {
+          console.error('PDF生成失敗:', error);
+          reject(error);
+        });
+      });
+
+    } catch (error) {
+      console.error('匯出PDF失敗:', error);
       throw error;
     }
   }

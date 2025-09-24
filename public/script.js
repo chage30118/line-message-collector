@@ -352,7 +352,9 @@ function exportData() {
         { value: 'users-csv', text: '📋 用戶資料 (CSV)' },
         { value: 'messages-csv', text: '💬 訊息資料 (CSV)' },
         { value: 'excel', text: '📊 完整資料 (Excel)' },
-        { value: 'json', text: '💾 完整資料 (JSON)' }
+        { value: 'json', text: '💾 完整資料 (JSON)' },
+        { value: 'images-zip', text: '📷 圖片檔案 (ZIP)' },
+        { value: 'pdf', text: '📄 統計報告 (PDF)' }
     ];
 
     let optionsHtml = exportOptions.map(option => 
@@ -375,7 +377,9 @@ function exportData() {
                         <small>
                             • CSV 格式適合在 Excel 中開啟<br>
                             • Excel 格式包含多個工作表和統計資料<br>
-                            • JSON 格式適合程式化處理
+                            • JSON 格式適合程式化處理<br>
+                            • ZIP 格式包含所有收集到的圖片檔案<br>
+                            • PDF 格式生成統計報告和訊息摘要
                         </small>
                     </div>
                 </div>
@@ -405,6 +409,12 @@ async function downloadExport(type) {
                 break;
             case 'json':
                 url = '/api/export/json';
+                break;
+            case 'images-zip':
+                url = '/api/export/images/zip';
+                break;
+            case 'pdf':
+                url = '/api/export/pdf';
                 break;
             default:
                 throw new Error('不支援的匯出格式');
