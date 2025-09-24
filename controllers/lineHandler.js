@@ -2,6 +2,7 @@ const { Client } = require('@line/bot-sdk');
 const LimitService = require('../services/limitService');
 const UserService = require('../services/userService');
 const MessageService = require('../services/messageService');
+const GroupService = require('../services/groupService');
 
 // LINE Bot 客戶端設定
 const lineClient = new Client({
@@ -51,9 +52,20 @@ class LineHandler {
       return { status: 'rejected', reason: 'message_limit_exceeded' };
     }
 
+    // 提取群組資訊
+    const groupInfo = GroupService.extractGroupInfoFromEvent(event);
+    
     // 取得用戶資訊
     const userProfile = await this.getUserProfile(lineUserId);
-    const user = await UserService.getOrCreateUser(lineUserId, userProfile);
+    
+    // 如果來自群組，獲取群組名稱
+    let groupDisplayName = null;
+    if (groupInfo.isFromGroup && groupInfo.groupId) {
+      groupDisplayName = await GroupService.getGroupDisplayName(groupInfo.groupId);
+      console.log(`📱 群組訊息: ${groupDisplayName || groupInfo.groupId} (${lineUserId})`);
+    }
+    
+    const user = await UserService.getOrCreateUser(lineUserId, userProfile, groupDisplayName);
 
     // 根據訊息類型處理
     switch (event.message.type) {

@@ -44,12 +44,8 @@ class MessageService {
       timestamp: new Date(event.timestamp).toISOString()
     };
 
-    // 嘗試從訊息中分析用戶的群組名稱
-    try {
-      await UserService.analyzeNameFromMessage(user, event.message.text);
-    } catch (error) {
-      console.warn('分析用戶名稱時發生錯誤:', error);
-    }
+    // 群組名稱現在直接在 webhook 處理時從 LINE API 獲取
+    // 不再需要從訊息內容分析
 
     return await this.saveMessage(messageData);
   }

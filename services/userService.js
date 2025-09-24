@@ -2,7 +2,7 @@ const { supabase } = require('../config/supabase');
 
 class UserService {
   // 取得或建立用戶
-  static async getOrCreateUser(lineUserId, userProfile = null) {
+  static async getOrCreateUser(lineUserId, userProfile = null, groupDisplayName = null) {
     try {
       // 先查詢用戶是否已存在
       const { data: existingUser, error: selectError } = await supabase
@@ -17,16 +17,28 @@ class UserService {
 
       // 用戶已存在，更新資訊並返回
       if (existingUser) {
+        const updateData = {};
+        
+        // 更新用戶基本資訊
         if (userProfile) {
+          updateData.display_name = userProfile.displayName;
+          updateData.picture_url = userProfile.pictureUrl;
+          updateData.status_message = userProfile.statusMessage;
+          updateData.language = userProfile.language;
+          updateData.updated_at = new Date().toISOString();
+        }
+        
+        // 更新群組名稱（如果提供且尚未設定）
+        if (groupDisplayName && !existingUser.group_display_name) {
+          updateData.group_display_name = groupDisplayName;
+          console.log(`🏷️ 為用戶設定群組名稱: ${userProfile?.displayName || lineUserId} -> ${groupDisplayName}`);
+        }
+        
+        // 如果有更新資料，才執行更新
+        if (Object.keys(updateData).length > 0) {
           const { data: updatedUser, error: updateError } = await supabase
             .from('users')
-            .update({
-              display_name: userProfile.displayName,
-              picture_url: userProfile.pictureUrl,
-              status_message: userProfile.statusMessage,
-              language: userProfile.language,
-              updated_at: new Date().toISOString()
-            })
+            .update(updateData)
             .eq('id', existingUser.id)
             .select()
             .single();
@@ -34,6 +46,7 @@ class UserService {
           if (updateError) throw updateError;
           return updatedUser;
         }
+        
         return existingUser;
       }
 
@@ -44,8 +57,13 @@ class UserService {
         picture_url: userProfile?.pictureUrl || null,
         status_message: userProfile?.statusMessage || null,
         language: userProfile?.language || null,
+        group_display_name: groupDisplayName || null,
         is_active: true
       };
+      
+      if (groupDisplayName) {
+        console.log(`🆕 建立新用戶並設定群組名稱: ${userProfile?.displayName || lineUserId} -> ${groupDisplayName}`);
+      }
 
       const { data: newUser, error: insertError } = await supabase
         .from('users')
@@ -55,17 +73,6 @@ class UserService {
 
       if (insertError) throw insertError;
       console.log(`✅ 新用戶建立成功: ${newUser.display_name || lineUserId}`);
-
-      // 嘗試從 display_name 自動提取群組名稱
-      if (newUser.display_name) {
-        const extractedName = this.extractNameFromDisplayName(newUser.display_name);
-        if (extractedName) {
-          console.log(`🔍 自動設定群組名稱: ${extractedName} (新用戶: ${newUser.display_name})`);
-          const updatedUser = await this.updateGroupDisplayName(newUser.id, extractedName);
-          return updatedUser;
-        }
-      }
-
       return newUser;
 
     } catch (error) {
