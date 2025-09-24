@@ -71,3 +71,4 @@ NODE_ENV=production
 - 不要將 `.env` 檔案上傳到 GitHub
 - 所有敏感資料都要在 Render 的環境變數中設定
 - Render 免費方案會在 15 分鐘無活動後休眠
+- 已移除所有 localtunnel 相關設定，確保安全性
