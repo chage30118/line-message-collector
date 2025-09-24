@@ -8,6 +8,44 @@ let allUsers = [];
 console.log('Defining showNotification function');
 function showNotification(message, type = 'info') {
     console.log('showNotification called with:', message, type);
+    // 更新用戶的群組顯示名稱
+async function updateGroupDisplayName(userId, groupDisplayName) {
+    try {
+        if (!groupDisplayName || groupDisplayName.trim().length === 0) {
+            showNotification('⚠️ 群組顯示名稱不能為空', 'error');
+            return;
+        }
+
+        showNotification('🔄 正在更新群組顯示名稱...', 'info');
+
+        const response = await fetch(`/api/users/${userId}/group-name`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                groupDisplayName: groupDisplayName.trim()
+            })
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            showNotification(`✅ 群組顯示名稱更新成功: ${groupDisplayName}`, 'success');
+            // 重新載入用戶列表
+            setTimeout(() => loadUsers(), 1000);
+        } else {
+            throw new Error(result.error || '更新失敗');
+        }
+    } catch (error) {
+        console.error('更新群組顯示名稱失敗:', error);
+        showNotification(`❌ 更新失敗: ${error.message}`, 'error');
+    }
+}
+
+// 移除調試 console.log
+function showNotification(message, type = 'info') {
+    console.log('showNotification called with:', message, type);
     // 移除現有通知
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
@@ -235,12 +273,25 @@ function displayUsers(users) {
         const createdAt = new Date(user.created_at).toLocaleDateString('zh-TW');
         
         return `
-            <div class="user-card">
+            <div class="user-card" data-user-id="${user.id}">
                 ${user.picture_url ? 
                     `<img src="${user.picture_url}" alt="用戶頭像" class="user-avatar">` : 
                     '<div class="user-avatar" style="background: #ddd; display: flex; align-items: center; justify-content: center; font-size: 2rem;">👤</div>'
                 }
                 <h3>${user.display_name || '未知用戶'}</h3>
+                <div class="group-name-section">
+                    <p><strong>群組名稱:</strong></p>
+                    <div class="group-name-input-container">
+                        <input type="text" 
+                               class="group-name-input" 
+                               value="${user.group_display_name || ''}" 
+                               placeholder="輸入群組中的顯示名稱"
+                               onchange="updateGroupDisplayName(${user.id}, this.value)">
+                        <button class="update-name-btn" onclick="updateGroupDisplayName(${user.id}, this.parentElement.querySelector('.group-name-input').value)">
+                            💾 更新
+                        </button>
+                    </div>
+                </div>
                 <p><strong>用戶 ID:</strong> ${user.line_user_id}</p>
                 <p><strong>加入時間:</strong> ${createdAt}</p>
                 <p><strong>語言:</strong> ${user.language || '未知'}</p>

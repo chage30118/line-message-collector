@@ -298,25 +298,33 @@ class ExportService {
         // 添加每個圖片檔案
         const downloadPromises = imageMessages.map(async (msg, index) => {
           try {
+            console.log(`🔍 處理圖片 ${index + 1}/${imageMessages.length}: ${msg.file_path}`);
+            
             const fileUrl = await FileService.getFileUrl(msg.file_path);
             if (!fileUrl) {
-              console.warn(`無法取得圖片URL: ${msg.file_path}`);
+              console.warn(`❌ 無法取得圖片URL: ${msg.file_path}`);
               return;
             }
 
+            console.log(`📡 開始下載圖片: ${fileUrl.substring(0, 100)}...`);
+            
             const response = await axios.get(fileUrl, {
               responseType: 'stream',
-              timeout: 10000
+              timeout: 30000, // 增加超時時間到30秒
+              headers: {
+                'User-Agent': 'LINE-Message-Collector/1.0'
+              }
             });
 
             const fileExtension = path.extname(msg.file_name) || '.jpg';
             const safeFileName = `${String(index + 1).padStart(3, '0')}_${msg.users?.display_name || 'unknown'}_${Date.parse(msg.created_at)}${fileExtension}`;
             
             archive.append(response.data, { name: safeFileName });
-            console.log(`📷 添加圖片: ${safeFileName}`);
+            console.log(`✅ 成功添加圖片: ${safeFileName}`);
 
           } catch (error) {
-            console.error(`下載圖片失敗 ${msg.file_path}:`, error.message);
+            console.error(`❌ 下載圖片失敗 ${msg.file_path}:`, error.message);
+            console.error('錯誤詳情:', error.response?.status, error.response?.statusText);
           }
         });
 
