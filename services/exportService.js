@@ -36,6 +36,7 @@ class ExportService {
           { id: 'id', title: 'ID' },
           { id: 'line_user_id', title: 'LINE用戶ID' },
           { id: 'display_name', title: '顯示名稱' },
+          { id: 'group_display_name', title: '群組顯示名稱' },
           { id: 'picture_url', title: '頭像URL' },
           { id: 'status_message', title: '狀態訊息' },
           { id: 'language', title: '語言' },
@@ -74,6 +75,7 @@ class ExportService {
           { id: 'id', title: 'ID' },
           { id: 'line_message_id', title: 'LINE訊息ID' },
           { id: 'user_display_name', title: '用戶名稱' },
+          { id: 'group_display_name', title: '群組顯示名稱' },
           { id: 'line_user_id', title: 'LINE用戶ID' },
           { id: 'message_type', title: '訊息類型' },
           { id: 'content', title: '訊息內容' },
@@ -89,6 +91,7 @@ class ExportService {
       const exportData = messages.map(msg => ({
         ...msg,
         user_display_name: msg.users?.display_name || '未知用戶',
+        group_display_name: msg.users?.group_display_name || '',
         line_user_id: msg.users?.line_user_id || '未知',
         timestamp: new Date(msg.timestamp).toLocaleString('zh-TW'),
         created_at: new Date(msg.created_at).toLocaleString('zh-TW')
@@ -127,6 +130,7 @@ class ExportService {
         { header: 'ID', key: 'id', width: 10 },
         { header: 'LINE用戶ID', key: 'line_user_id', width: 30 },
         { header: '顯示名稱', key: 'display_name', width: 20 },
+        { header: '群組顯示名稱', key: 'group_display_name', width: 25 },
         { header: '頭像URL', key: 'picture_url', width: 50 },
         { header: '狀態訊息', key: 'status_message', width: 30 },
         { header: '語言', key: 'language', width: 10 },
@@ -154,6 +158,7 @@ class ExportService {
         { header: 'ID', key: 'id', width: 10 },
         { header: 'LINE訊息ID', key: 'line_message_id', width: 25 },
         { header: '用戶名稱', key: 'user_display_name', width: 20 },
+        { header: '群組顯示名稱', key: 'group_display_name', width: 25 },
         { header: 'LINE用戶ID', key: 'line_user_id', width: 30 },
         { header: '訊息類型', key: 'message_type', width: 15 },
         { header: '訊息內容', key: 'content', width: 50 },
@@ -168,6 +173,7 @@ class ExportService {
       const formattedMessages = messages.map(msg => ({
         ...msg,
         user_display_name: msg.users?.display_name || '未知用戶',
+        group_display_name: msg.users?.group_display_name || '',
         line_user_id: msg.users?.line_user_id || '未知',
         timestamp: new Date(msg.timestamp).toLocaleString('zh-TW'),
         created_at: new Date(msg.created_at).toLocaleString('zh-TW')
@@ -317,7 +323,8 @@ class ExportService {
             });
 
             const fileExtension = path.extname(msg.file_name) || '.jpg';
-            const safeFileName = `${String(index + 1).padStart(3, '0')}_${msg.users?.display_name || 'unknown'}_${Date.parse(msg.created_at)}${fileExtension}`;
+            const displayName = msg.users?.group_display_name || msg.users?.display_name || 'unknown';
+            const safeFileName = `${String(index + 1).padStart(3, '0')}_${displayName}_${Date.parse(msg.created_at)}${fileExtension}`;
             
             archive.append(response.data, { name: safeFileName });
             console.log(`✅ 成功添加圖片: ${safeFileName}`);
@@ -406,11 +413,12 @@ class ExportService {
           }
           
           const userName = user.display_name || user.line_user_id || 'Unknown';
+          const groupName = user.group_display_name ? ` [${user.group_display_name}]` : '';
           const messageCount = user.message_count || 0;
           const lastMessage = user.last_message_at ? 
             new Date(user.last_message_at).toLocaleDateString('zh-TW') : 'Never';
             
-          doc.text(`${index + 1}. ${userName} (${messageCount} messages, Last: ${lastMessage})`, 50, yPosition);
+          doc.text(`${index + 1}. ${userName}${groupName} (${messageCount} messages, Last: ${lastMessage})`, 50, yPosition);
           yPosition += 15;
         });
 
@@ -433,12 +441,13 @@ class ExportService {
           }
 
           const userName = msg.users?.display_name || 'Unknown';
+          const groupName = msg.users?.group_display_name ? ` [${msg.users.group_display_name}]` : '';
           const timestamp = new Date(msg.timestamp).toLocaleString('zh-TW');
           const content = msg.message_type === 'text' ? 
             (msg.content?.substring(0, 50) + (msg.content?.length > 50 ? '...' : '')) : 
             `[${msg.message_type.toUpperCase()}]`;
 
-          doc.text(`${timestamp} - ${userName}:`, 50, yPosition);
+          doc.text(`${timestamp} - ${userName}${groupName}:`, 50, yPosition);
           doc.text(`  ${content}`, 50, yPosition + 12);
           yPosition += 30;
         });
