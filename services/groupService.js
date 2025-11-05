@@ -82,6 +82,62 @@ class GroupService {
       return null;
     }
   }
+
+  // 獲取用戶 Profile 資訊 (LINE 顯示名稱)
+  static async getUserProfile(userId) {
+    try {
+      const profile = await lineClient.getProfile(userId);
+      
+      console.log(`✅ 獲取用戶資料成功: ${userId}`, {
+        displayName: profile.displayName,
+        pictureUrl: profile.pictureUrl,
+        statusMessage: profile.statusMessage
+      });
+      
+      return {
+        userId: userId,
+        displayName: profile.displayName,
+        pictureUrl: profile.pictureUrl,
+        statusMessage: profile.statusMessage,
+        language: profile.language
+      };
+    } catch (error) {
+      console.warn(`⚠️ 獲取用戶資料失敗: ${userId}`, error.message);
+      
+      // 如果是 404 錯誤，用戶可能已封鎖機器人
+      if (error.statusCode === 404) {
+        console.log(`用戶 ${userId} 可能已封鎖機器人或不存在`);
+      }
+      
+      return {
+        userId: userId,
+        displayName: null,
+        pictureUrl: null,
+        statusMessage: null,
+        language: null
+      };
+    }
+  }
+
+  // 獲取完整的事件用戶資訊 (包含 LINE 顯示名稱)
+  static async getCompleteUserInfo(event) {
+    const groupInfo = this.extractGroupInfoFromEvent(event);
+    
+    if (!groupInfo.userId) {
+      return {
+        ...groupInfo,
+        userProfile: null
+      };
+    }
+
+    // 獲取用戶的 LINE Profile 資料
+    const userProfile = await this.getUserProfile(groupInfo.userId);
+    
+    return {
+      ...groupInfo,
+      userProfile: userProfile
+    };
+  }
 }
 
 module.exports = GroupService;

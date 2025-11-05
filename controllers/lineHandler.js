@@ -52,17 +52,17 @@ class LineHandler {
       return { status: 'rejected', reason: 'message_limit_exceeded' };
     }
 
-    // 提取群組資訊
-    const groupInfo = GroupService.extractGroupInfoFromEvent(event);
-    
-    // 取得用戶資訊
-    const userProfile = await this.getUserProfile(lineUserId);
+    // 獲取完整的用戶和群組資訊 (包含 LINE Profile API)
+    const completeUserInfo = await GroupService.getCompleteUserInfo(event);
+    const { userProfile, isFromGroup, groupId } = completeUserInfo;
     
     // 如果來自群組，獲取群組名稱
     let groupDisplayName = null;
-    if (groupInfo.isFromGroup && groupInfo.groupId) {
-      groupDisplayName = await GroupService.getGroupDisplayName(groupInfo.groupId);
-      console.log(`📱 群組訊息: ${groupDisplayName || groupInfo.groupId} (${lineUserId})`);
+    if (isFromGroup && groupId) {
+      groupDisplayName = await GroupService.getGroupDisplayName(groupId);
+      console.log(`📱 群組訊息: ${groupDisplayName || groupId} (${userProfile?.displayName || lineUserId})`);
+    } else {
+      console.log(`💬 個人訊息: ${userProfile?.displayName || lineUserId}`);
     }
     
     const user = await UserService.getOrCreateUser(lineUserId, userProfile, groupDisplayName);

@@ -1,7 +1,7 @@
 const { supabase } = require('../config/supabase');
 
 class UserService {
-  // 取得或建立用戶
+  // 取得或建立用戶 (整合 LINE Profile API)
   static async getOrCreateUser(lineUserId, userProfile = null, groupDisplayName = null) {
     try {
       // 先查詢用戶是否已存在
@@ -19,19 +19,30 @@ class UserService {
       if (existingUser) {
         const updateData = {};
         
-        // 更新用戶基本資訊
+        // 更新用戶基本資訊 (來自 LINE Profile API)
         if (userProfile) {
           updateData.display_name = userProfile.displayName;
           updateData.picture_url = userProfile.pictureUrl;
           updateData.status_message = userProfile.statusMessage;
           updateData.language = userProfile.language;
           updateData.updated_at = new Date().toISOString();
+          
+          console.log(`🔄 更新用戶 LINE 資料: ${userProfile.displayName || lineUserId}`);
         }
         
         // 更新群組名稱（如果提供且尚未設定）
         if (groupDisplayName && !existingUser.group_display_name) {
           updateData.group_display_name = groupDisplayName;
           console.log(`🏷️ 為用戶設定群組名稱: ${userProfile?.displayName || lineUserId} -> ${groupDisplayName}`);
+        }
+        
+        // 分析並建議客戶姓名（如果尚未設定）
+        if (userProfile && !existingUser.customer_name) {
+          const suggestion = this.analyzeCustomerNameFromProfile(userProfile);
+          if (suggestion) {
+            updateData.suggested_name = suggestion;
+            console.log(`💡 建議客戶姓名: ${userProfile.displayName} -> ${suggestion}`);
+          }
         }
         
         // 如果有更新資料，才執行更新
@@ -138,77 +149,161 @@ class UserService {
     }
   }
 
-  // 自動分析訊息中的名稱
-  static async analyzeNameFromMessage(user, messageText) {
+  // 智能分析客戶姓名（輔助功能）
+  static async analyzeCustomerNameFromMessage(user, messageText) {
     try {
       // 常見的自我介紹模式
       const patterns = [
         /我是([^，。！？\s]+)/,
-        /這是([^，。！？\s]+)/,
+        /我叫([^，。！？\s]+)/,
         /叫我([^，。！？\s]+)/,
-        /^([A-Za-z0-9\u4e00-\u9fa5\/\-\_\+\(\)（）]+)$/, // 單獨的名稱（允許括號）
-        // 如果用戶的 display_name 包含特殊格式，嘗試提取
-        // 例如："潘呈榆-公用手機" -> 可能想要 "潘呈榆"
+        /姓名[：:]\s*([^，。！？\s]+)/,
+        /名字[：:]\s*([^，。！？\s]+)/,
+        // 更嚴格的單獨名稱匹配
+        /^([A-Za-z\u4e00-\u9fa5]{2,8})$/, // 只允許中英文，2-8個字符
       ];
 
       for (const pattern of patterns) {
         const match = messageText.match(pattern);
-        if (match && match[1] && match[1].length > 1 && match[1].length < 30) {
+        if (match && match[1] && match[1].length >= 2 && match[1].length <= 8) {
           const possibleName = match[1].trim();
           
-          // 避免誤判常見詞彙
-          const commonWords = ['今天', '昨天', '明天', '什麼', '怎麼', '哪裡', '這樣', '那樣'];
-          if (!commonWords.includes(possibleName)) {
-            console.log(`🔍 發現可能的群組名稱: ${possibleName} (來自訊息: ${user.display_name})`);
+          // 避免誤判常見詞彙和商品名稱
+          const excludeWords = [
+            '今天', '昨天', '明天', '什麼', '怎麼', '哪裡', '這樣', '那樣',
+            '公司', '店面', '手機', '電話', '地址', '時間', '價格', '數量',
+            '商品', '產品', '服務', '訂單', '購買', '付款', '配送'
+          ];
+          
+          if (!excludeWords.some(word => possibleName.includes(word))) {
+            console.log(`🤖 AI建議客戶姓名: ${possibleName} (來自訊息: "${messageText.substring(0, 20)}...")`);
             
-            // 如果用戶還沒有群組顯示名稱，自動設定
-            if (!user.group_display_name) {
-              await this.updateGroupDisplayName(user.id, possibleName);
-              return possibleName;
-            }
+            // 只建議，不自動設定。需要客服確認
+            return {
+              suggested: true,
+              name: possibleName,
+              source: 'message_analysis',
+              confidence: 'medium'
+            };
           }
         }
       }
 
-      // 如果訊息分析失敗，嘗試從 display_name 提取
-      if (!user.group_display_name && user.display_name) {
+      // 從 display_name 提取建議
+      if (user.display_name) {
         const extractedName = this.extractNameFromDisplayName(user.display_name);
         if (extractedName) {
-          console.log(`🔍 從顯示名稱提取群組名稱: ${extractedName} (用戶: ${user.display_name})`);
-          await this.updateGroupDisplayName(user.id, extractedName);
-          return extractedName;
+          console.log(`🤖 AI建議客戶姓名: ${extractedName} (來自LINE名稱: ${user.display_name})`);
+          return {
+            suggested: true,
+            name: extractedName,
+            source: 'display_name_analysis',
+            confidence: 'high'
+          };
         }
       }
       
       return null;
     } catch (error) {
-      console.error('分析訊息中的名稱失敗:', error);
+      console.error('智能分析客戶姓名失敗:', error);
       return null;
     }
   }
 
-  // 從 display_name 提取可能的群組名稱
+  // 從 LINE Profile 分析可能的客戶姓名
+  static analyzeCustomerNameFromProfile(userProfile) {
+    if (!userProfile || !userProfile.displayName) return null;
+
+    try {
+      const displayName = userProfile.displayName.trim();
+      
+      // 1. 檢查是否為明顯的真實姓名模式
+      const namePatterns = {
+        // 中文姓名模式 (2-4個中文字)
+        chineseName: /^[\u4e00-\u9fa5]{2,4}$/,
+        // 英文姓名模式
+        englishName: /^[A-Za-z\s]{2,20}$/,
+        // 姓名 + 常見後綴
+        nameWithSuffix: /^([\u4e00-\u9fa5A-Za-z\s]{2,10})\s*[-–—]?\s*(先生|小姐|女士|老師|經理|主任)$/
+      };
+
+      // 檢查中文姓名
+      if (namePatterns.chineseName.test(displayName)) {
+        return {
+          suggested_name: displayName,
+          source: 'profile_chinese_name',
+          confidence: 'high'
+        };
+      }
+
+      // 檢查帶後綴的姓名
+      const suffixMatch = displayName.match(namePatterns.nameWithSuffix);
+      if (suffixMatch) {
+        return {
+          suggested_name: suffixMatch[1].trim(),
+          source: 'profile_name_with_suffix',
+          confidence: 'medium'
+        };
+      }
+
+      // 檢查英文姓名
+      if (namePatterns.englishName.test(displayName) && !displayName.toLowerCase().includes('user')) {
+        return {
+          suggested_name: displayName,
+          source: 'profile_english_name',
+          confidence: 'medium'
+        };
+      }
+
+      // 2. 清理顯示名稱，移除非姓名元素
+      const cleanedName = this.extractNameFromDisplayName(displayName);
+      if (cleanedName) {
+        return {
+          suggested_name: cleanedName,
+          source: 'profile_cleaned_name',
+          confidence: 'low'
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('分析 Profile 姓名失敗:', error);
+      return null;
+    }
+  }
+
+  // 從 display_name 提取可能的客戶姓名
   static extractNameFromDisplayName(displayName) {
     if (!displayName || displayName.length < 2) return null;
 
-    // 移除常見的後綴
-    const suffixes = ['-公用手機', '-手機', '的手機', '手機', '🐶', '🐱', '😊', '👍'];
-    let cleanName = displayName;
-    
-    for (const suffix of suffixes) {
-      if (cleanName.endsWith(suffix)) {
-        cleanName = cleanName.replace(suffix, '').trim();
-        break;
-      }
-    }
+    // 移除常見的後綴和前綴
+    const patterns = [
+      // 後綴模式
+      { pattern: /(.+?)[-–—]?(公用手機|手機|的手機|iPhone|Android)$/, group: 1 },
+      { pattern: /(.+?)[-–—]?(老闆|主管|經理|助理|秘書)$/, group: 1 },
+      { pattern: /(.+?)[-–—]?(媽媽|爸爸|姐姐|哥哥|弟弟|妹妹)$/, group: 1 },
+      // 移除表情符號和數字
+      { pattern: /^(.+?)[🐶🐱😊👍💪❤️💯\d\s]*$/, group: 1 },
+      // 移除英文後綴
+      { pattern: /^(.+?)\s*(phone|mobile|cell|work|home)$/i, group: 1 }
+    ];
 
-    // 如果清理後的名稱長度合理且不同於原名
-    if (cleanName.length >= 2 && cleanName.length <= 10 && cleanName !== displayName) {
-      return cleanName;
+    for (const { pattern, group } of patterns) {
+      const match = displayName.match(pattern);
+      if (match && match[group]) {
+        const cleanName = match[group].trim();
+        
+        // 檢查清理後的名稱是否合理
+        if (cleanName.length >= 2 && cleanName.length <= 10 && cleanName !== displayName) {
+          return cleanName;
+        }
+      }
     }
 
     return null;
   }
 }
+
+module.exports = UserService;
 
 module.exports = UserService;

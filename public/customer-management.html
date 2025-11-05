@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>客戶姓名管理 - LINE 訊息收集系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: #00C300;
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #00C300;
+        }
+
+        .actions-bar {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .btn-primary {
+            background: #00C300;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #00A000;
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #6c757d;
+            border: 1px solid #dee2e6;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .customers-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .table-header {
+            background: #f8f9fa;
+            padding: 15px 20px;
+            font-weight: bold;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .customer-row {
+            padding: 15px 20px;
+            border-bottom: 1px solid #f0f0f0;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .customer-row:last-child {
+            border-bottom: none;
+        }
+
+        .customer-info {
+            flex: 1;
+        }
+
+        .display-name {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .user-id {
+            font-size: 12px;
+            color: #666;
+            font-family: monospace;
+        }
+
+        .recent-messages {
+            flex: 2;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .message-item {
+            background: #f8f9fa;
+            padding: 5px 10px;
+            margin: 2px 0;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+
+        .name-input {
+            flex: 1;
+            padding: 8px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+
+        .save-btn {
+            padding: 8px 16px;
+            background: #00C300;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .save-btn:hover {
+            background: #00A000;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: black;
+        }
+
+        .file-input {
+            margin: 10px 0;
+            padding: 10px;
+            border: 2px dashed #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 4px;
+            color: white;
+            z-index: 1000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #28a745;
+        }
+
+        .notification.error {
+            background: #dc3545;
+        }
+
+        @media (max-width: 768px) {
+            .customer-row {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 10px;
+            }
+
+            .actions-bar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .btn {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏷️ 客戶姓名管理系統</h1>
+            <p>管理您的 LINE 客戶真實姓名，提升客服效率</p>
+        </div>
+
+        <!-- 統計資料 -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-number" id="totalCustomers">-</div>
+                <div>總客戶數</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="namedCustomers">-</div>
+                <div>已設定姓名</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="unnamedCustomers">-</div>
+                <div>待設定姓名</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="completionRate">-</div>
+                <div>完成率 (%)</div>
+            </div>
+        </div>
+
+        <!-- 操作按鈕 -->
+        <div class="actions-bar">
+            <button class="btn btn-primary" onclick="refreshData()">🔄 重新整理</button>
+            <button class="btn btn-secondary" onclick="exportData()">📥 匯出資料</button>
+            <button class="btn btn-secondary" onclick="openImportModal()">📤 匯入資料</button>
+            <button class="btn btn-primary" onclick="batchSave()">💾 批量儲存</button>
+        </div>
+
+        <!-- 客戶列表 -->
+        <div class="customers-table">
+            <div class="table-header">
+                待設定姓名的客戶列表
+            </div>
+            <div id="customersList" class="loading">
+                載入客戶資料中...
+            </div>
+        </div>
+
+        <!-- 匯入資料彈窗 -->
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeImportModal()">&times;</span>
+                <h2>匯入客戶資料</h2>
+                <p>請上傳包含 user_id 和 customer_name 欄位的 CSV 檔案</p>
+                <div class="file-input">
+                    <input type="file" id="csvFile" accept=".csv" onchange="handleFileSelect(event)">
+                    <p>或拖拽 CSV 檔案到這裡</p>
+                </div>
+                <div>
+                    <h3>CSV 格式範例：</h3>
+                    <pre>user_id,customer_name
+U1234567890abcdef,王小明
+U2345678901bcdefg,李小華</pre>
+                </div>
+                <div style="margin-top: 20px;">
+                    <button class="btn btn-primary" onclick="importData()">開始匯入</button>
+                    <button class="btn btn-secondary" onclick="closeImportModal()">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知 -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        let customersData = [];
+        let csvFileContent = null;
+
+        // 頁面載入時初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadStats();
+            loadCustomers();
+        });
+
+        // 載入統計資料
+        async function loadStats() {
+            try {
+                const response = await fetch('/api/customers/stats');
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('totalCustomers').textContent = data.stats.total_customers;
+                    document.getElementById('namedCustomers').textContent = data.stats.named_customers;
+                    document.getElementById('unnamedCustomers').textContent = data.stats.unnamed_customers;
+                    document.getElementById('completionRate').textContent = data.stats.completion_rate;
+                }
+            } catch (error) {
+                console.error('載入統計資料失敗:', error);
+            }
+        }
+
+        // 載入需要設定姓名的客戶
+        async function loadCustomers() {
+            try {
+                const response = await fetch('/api/customers/needing-names');
+                const data = await response.json();
+                
+                if (data.success) {
+                    customersData = data.customers;
+                    renderCustomers();
+                } else {
+                    showNotification('載入客戶資料失敗', 'error');
+                }
+            } catch (error) {
+                console.error('載入客戶資料失敗:', error);
+                showNotification('載入客戶資料失敗', 'error');
+            }
+        }
+
+        // 渲染客戶列表
+        function renderCustomers() {
+            const container = document.getElementById('customersList');
+            
+            if (customersData.length === 0) {
+                container.innerHTML = '<div style="padding: 40px; text-align: center; color: #666;">🎉 所有客戶都已設定姓名！</div>';
+                return;
+            }
+
+            container.innerHTML = customersData.map(customer => `
+                <div class="customer-row">
+                    <div class="customer-info">
+                        <div class="display-name">${customer.display_name || '未設定顯示名稱'}</div>
+                        <div class="user-id">${customer.user_id}</div>
+                    </div>
+                    <div class="recent-messages">
+                        <strong>最近訊息：</strong>
+                        ${customer.recent_messages.length > 0 
+                            ? customer.recent_messages.map(msg => 
+                                `<div class="message-item">${msg.text.substring(0, 50)}${msg.text.length > 50 ? '...' : ''}</div>`
+                              ).join('')
+                            : '沒有訊息記錄'
+                        }
+                    </div>
+                    <input type="text" 
+                           class="name-input" 
+                           placeholder="請輸入客戶真實姓名"
+                           value="${customer.customer_name || ''}"
+                           data-user-id="${customer.user_id}">
+                    <button class="save-btn" onclick="saveCustomerName('${customer.user_id}')">儲存</button>
+                </div>
+            `).join('');
+        }
+
+        // 儲存單個客戶姓名
+        async function saveCustomerName(userId) {
+            const input = document.querySelector(`input[data-user-id="${userId}"]`);
+            const customerName = input.value.trim();
+            
+            if (!customerName) {
+                showNotification('請輸入客戶姓名', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/users/update-customer-name', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        user_id: userId,
+                        customer_name: customerName
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('姓名儲存成功', 'success');
+                    // 從列表中移除已設定的客戶
+                    customersData = customersData.filter(c => c.user_id !== userId);
+                    renderCustomers();
+                    loadStats(); // 更新統計
+                } else {
+                    showNotification('儲存失敗：' + data.message, 'error');
+                }
+            } catch (error) {
+                console.error('儲存姓名失敗:', error);
+                showNotification('儲存失敗', 'error');
+            }
+        }
+
+        // 批量儲存
+        async function batchSave() {
+            const inputs = document.querySelectorAll('.name-input');
+            const updates = [];
+            
+            inputs.forEach(input => {
+                const userId = input.dataset.userId;
+                const customerName = input.value.trim();
+                
+                if (customerName) {
+                    updates.push({
+                        user_id: userId,
+                        customer_name: customerName
+                    });
+                }
+            });
+
+            if (updates.length === 0) {
+                showNotification('沒有要儲存的資料', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/customers/batch-update', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ updates })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(`成功儲存 ${data.results.filter(r => r.success).length} 位客戶姓名`, 'success');
+                    refreshData();
+                } else {
+                    showNotification('批量儲存失敗', 'error');
+                }
+            } catch (error) {
+                console.error('批量儲存失敗:', error);
+                showNotification('批量儲存失敗', 'error');
+            }
+        }
+
+        // 匯出資料
+        async function exportData() {
+            try {
+                const response = await fetch('/api/customers/export');
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `customer_data_${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    showNotification('資料匯出成功', 'success');
+                } else {
+                    showNotification('匯出失敗', 'error');
+                }
+            } catch (error) {
+                console.error('匯出失敗:', error);
+                showNotification('匯出失敗', 'error');
+            }
+        }
+
+        // 開啟匯入彈窗
+        function openImportModal() {
+            document.getElementById('importModal').style.display = 'block';
+        }
+
+        // 關閉匯入彈窗
+        function closeImportModal() {
+            document.getElementById('importModal').style.display = 'none';
+            csvFileContent = null;
+            document.getElementById('csvFile').value = '';
+        }
+
+        // 處理檔案選擇
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'text/csv') {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    csvFileContent = e.target.result;
+                };
+                reader.readAsText(file, 'UTF-8');
+            } else {
+                showNotification('請選擇 CSV 檔案', 'error');
+            }
+        }
+
+        // 匯入資料
+        async function importData() {
+            if (!csvFileContent) {
+                showNotification('請先選擇 CSV 檔案', 'error');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/customers/import', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ csvData: csvFileContent })
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(`成功匯入 ${data.total} 筆資料`, 'success');
+                    closeImportModal();
+                    refreshData();
+                } else {
+                    showNotification('匯入失敗：' + data.message, 'error');
+                }
+            } catch (error) {
+                console.error('匯入失敗:', error);
+                showNotification('匯入失敗', 'error');
+            }
+        }
+
+        // 重新整理資料
+        function refreshData() {
+            loadStats();
+            loadCustomers();
+        }
+
+        // 顯示通知
+        function showNotification(message, type) {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type} show`;
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // 點擊彈窗外部關閉
+        window.onclick = function(event) {
+            const modal = document.getElementById('importModal');
+            if (event.target === modal) {
+                closeImportModal();
+            }
+        }
+    </script>
+</body>
+</html>

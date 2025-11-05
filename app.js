@@ -6,6 +6,7 @@ require('dotenv').config();
 const webhookRoutes = require('./routes/webhook');
 const apiRoutes = require('./routes/api');
 const userRoutes = require('./routes/users');
+const customerRoutes = require('./routes/customers');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -36,6 +37,7 @@ app.get('/health', (req, res) => {
 app.use('/webhook', webhookRoutes);
 app.use('/api', apiRoutes);
 app.use('/api', userRoutes);
+app.use('/api/customers', customerRoutes);
 
 // 全域錯誤處理
 app.use((error, req, res, next) => {

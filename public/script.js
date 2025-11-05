@@ -281,17 +281,23 @@ function displayUsers(users) {
                 }
                 <h3>${user.display_name || '未知用戶'}</h3>
                 <div class="group-name-section">
-                    <p><strong>群組名稱:</strong></p>
-                    <div class="group-name-input-container">
+                    <p><strong>客戶姓名:</strong></p>
+                    <div class="customer-name-container">
                         <input type="text" 
-                               class="group-name-input" 
+                               class="customer-name-input" 
                                value="${user.group_display_name || ''}" 
-                               placeholder="輸入群組中的顯示名稱"
-                               onchange="updateGroupDisplayName(${user.id}, this.value)">
-                        <button class="update-name-btn" onclick="updateGroupDisplayName(${user.id}, this.parentElement.querySelector('.group-name-input').value)">
-                            💾 更新
+                               placeholder="請輸入客戶真實姓名"
+                               onchange="updateGroupDisplayName(${user.id}, this.value)"
+                               style="flex: 1; margin-right: 8px;">
+                        <button class="update-name-btn" 
+                                onclick="updateGroupDisplayName(${user.id}, this.parentElement.querySelector('.customer-name-input').value)"
+                                title="保存客戶姓名">
+                            💾
                         </button>
                     </div>
+                    <small style="color: #666; font-size: 0.75rem;">
+                        💡 LINE API無法獲取後台設定的聯絡人姓名，請在此手動設定
+                    </small>
                 </div>
                 <p><strong>用戶 ID:</strong> ${user.line_user_id}</p>
                 <p><strong>加入時間:</strong> ${createdAt}</p>
